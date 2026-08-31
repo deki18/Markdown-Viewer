@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' file: data: blob:; img-src 'self' file: data: http: https: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' file: data:; script-src 'self'; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Markdown 查看器</title>
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<link rel="stylesheet" href="vendor/hljs-light.css" id="hljs-theme">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <aside class="activitybar" aria-label="阅读工具">
+    <button class="activity-brand" id="btnToggleSidebar" title="收起侧栏 (Ctrl+B)" aria-label="收起或展开侧栏">
+      <span class="fluent-icon" aria-hidden="true">&#xE700;</span>
+    </button>
+    <nav class="side-tabs" aria-label="侧栏工具">
+      <button class="side-tab is-active" data-panel="files" title="文件">
+        <span class="fluent-icon" aria-hidden="true">&#xE8B7;</span><span>文件</span>
+      </button>
+      <button class="side-tab" data-panel="outline" title="当前文档目录">
+        <span class="fluent-icon" aria-hidden="true">&#xE8A4;</span><span>目录</span>
+      </button>
+      <button class="side-tab" data-panel="images" title="图片清单与检查">
+        <span class="fluent-icon" aria-hidden="true">&#xEB9F;</span><span>图片</span>
+      </button>
+      <button class="side-tab" data-panel="search" title="在文件夹中搜索">
+        <span class="fluent-icon" aria-hidden="true">&#xE721;</span><span>搜索</span>
+      </button>
+    </nav>
+    <button class="activity-settings" id="btnActivitySettings" title="设置" aria-label="打开设置">
+      <span class="fluent-icon" aria-hidden="true">&#xE713;</span>
+    </button>
+  </aside>
+
+  <div class="app-main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="toolbar-btn" id="btnOpenFile" title="打开文件 (Ctrl+O)">
+          <span class="fluent-icon" aria-hidden="true">&#xE8E5;</span><span>打开</span>
+        </button>
+        <button class="toolbar-btn" id="btnOpenFolder" title="打开文件夹 (Ctrl+Shift+O)">
+          <span class="fluent-icon" aria-hidden="true">&#xE8B7;</span><span>文件夹</span>
+        </button>
+      </div>
+      <div class="document-title" id="documentTitle">Markdown 查看器</div>
+      <div class="topbar-right">
+        <button class="toolbar-btn" id="btnEdit" title="编辑模式 (Ctrl+E)"><span class="fluent-icon" aria-hidden="true">&#xE70F;</span><span>编辑</span></button>
+        <button class="toolbar-btn" id="btnOutline" title="当前文档目录 (Ctrl+J)"><span class="fluent-icon" aria-hidden="true">&#xE8A4;</span><span>目录</span></button>
+        <button class="toolbar-btn" id="btnTheme" title="主题样式"><span class="fluent-icon" aria-hidden="true">&#xE790;</span><span>主题</span></button>
+        <button class="toolbar-btn" id="btnSettings" title="设置"><span class="fluent-icon" aria-hidden="true">&#xE713;</span><span>设置</span></button>
+      </div>
+    </header>
+
+    <nav class="tabbar" id="tabbar" aria-label="已打开文档"></nav>
+
+    <main class="workspace">
+      <aside class="sidebar" id="sidebar">
+      <div class="side-panels">
+        <section class="side-panel is-active" data-panel="files">
+          <div class="panel-head">
+            <strong>文件</strong>
+            <button class="mini-btn" id="btnTreeRefresh" title="刷新">刷新</button>
+          </div>
+          <div id="treeRoot" class="panel-path workspace-path">未打开文件夹</div>
+          <div class="tree" id="tree"></div>
+          <div class="recent-block">
+            <div class="panel-head"><span>最近打开</span></div>
+            <div class="recent-list" id="recentList"></div>
+          </div>
+        </section>
+
+        <section class="side-panel" data-panel="outline">
+          <div class="panel-head"><strong>当前文档目录</strong><span id="outlineCount" class="muted"></span></div>
+          <div class="outline" id="outline"></div>
+        </section>
+
+        <section class="side-panel" data-panel="images">
+          <div class="panel-head">
+            <span>图片清单</span>
+            <button class="mini-btn" id="btnImageAnalyze" title="分析图片与查重">分析</button>
+          </div>
+          <div class="image-summary" id="imageSummary"></div>
+          <div class="image-list" id="imageList"></div>
+        </section>
+
+        <section class="side-panel" data-panel="search">
+          <div class="panel-head"><span>全局搜索</span></div>
+          <div class="search-box">
+            <input id="globalSearchInput" class="text-input" type="text" placeholder="在当前文件夹搜索 (Ctrl+Shift+F)">
+            <button class="mini-btn" id="btnGlobalSearch">搜索</button>
+          </div>
+          <div class="search-results" id="searchResults"></div>
+        </section>
+      </div>
+      </aside>
+
+      <div class="splitter" id="splitter" role="separator" aria-orientation="vertical"
+        aria-label="调整侧栏宽度" aria-valuemin="220" aria-valuemax="520" aria-valuenow="320"
+        tabindex="0" title="拖动调整侧栏宽度；双击恢复默认"></div>
+
+      <section class="content" id="content">
+        <div class="findbar" id="findbar" role="search" aria-label="当前文档查找" hidden>
+          <span class="fluent-icon find-icon" aria-hidden="true">&#xE721;</span>
+          <input id="findInput" class="find-input" type="text" placeholder="查找当前文档 (Ctrl+F)" autocomplete="off" aria-label="查找关键词">
+          <span id="findCount" class="find-count" aria-live="polite"></span>
+          <button class="find-action" id="btnFindPrev" title="上一个 (Shift+Enter)" aria-label="上一个匹配项" disabled><span class="fluent-icon" aria-hidden="true">&#xE70E;</span></button>
+          <button class="find-action" id="btnFindNext" title="下一个 (Enter)" aria-label="下一个匹配项" disabled><span class="fluent-icon" aria-hidden="true">&#xE70D;</span></button>
+          <button class="find-action" id="btnFindClear" title="关闭查找 (Esc)" aria-label="关闭查找"><span class="fluent-icon" aria-hidden="true">&#xE711;</span></button>
+        </div>
+        <div class="empty-state" id="emptyState">
+          <div class="empty-inner">
+            <div class="empty-mark"><span class="fluent-icon" aria-hidden="true">&#xE8A5;</span></div>
+            <h1>开始阅读</h1>
+            <p>拖入 Markdown 文件，或从上方打开文件与文件夹。</p>
+            <ul class="shortcut-hints">
+              <li><b>Ctrl+O</b> 打开文件</li>
+              <li><b>Ctrl+E</b> 编辑模式</li>
+              <li><b>Ctrl+F</b> 当前文档查找</li>
+              <li><b>Ctrl+J</b> 显示目录</li>
+            </ul>
+          </div>
+        </div>
+        <div class="doc-wrap" id="docWrap" tabindex="-1" hidden>
+          <article class="markdown-body" id="preview"></article>
+          <textarea id="editor" class="editor" spellcheck="false" hidden></textarea>
+        </div>
+      </section>
+    </main>
+
+    <footer class="statusbar">
+      <span id="statPath" class="stat-item ellipsis"></span>
+      <span class="spacer"></span>
+      <span id="statImages" class="stat-item"></span>
+      <span id="statWords" class="stat-item"></span>
+      <span id="statRead" class="stat-item"></span>
+      <span id="statZoom" class="stat-item"></span>
+      <span id="statMsg" class="stat-item"></span>
+    </footer>
+  </div>
+</div>
+
+<div class="theme-popover" id="themePopover" hidden>
+  <div class="theme-popover-head"><strong>主题样式</strong><button class="find-action" id="btnThemeClose" aria-label="关闭主题菜单"><span class="fluent-icon" aria-hidden="true">&#xE711;</span></button></div>
+  <div class="theme-grid" role="radiogroup" aria-label="主题样式">
+    <button class="theme-option" data-theme="ink" role="radio"><span class="theme-preview preview-ink">Aa</span><span>墨白</span></button>
+    <button class="theme-option" data-theme="paper" role="radio"><span class="theme-preview preview-paper">Aa</span><span>纸张</span></button>
+    <button class="theme-option" data-theme="night" role="radio"><span class="theme-preview preview-night">Aa</span><span>夜读</span></button>
+    <button class="theme-option" data-theme="system" role="radio"><span class="theme-preview preview-system">Aa</span><span>自动</span></button>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox" hidden>
+  <button class="lb-close" id="lbClose" title="关闭 (Esc)">×</button>
+  <button class="lb-nav lb-prev" id="lbPrev" title="上一张">‹</button>
+  <img id="lbImg" alt="">
+  <button class="lb-nav lb-next" id="lbNext" title="下一张">›</button>
+  <div class="lb-meta" id="lbMeta"></div>
+</div>
+
+<div class="modal" id="settingsModal" hidden>
+  <div class="modal-card">
+    <h2>设置</h2>
+    <label class="field">
+      <span>图片根目录（一行一个，用于相对路径回退查找）</span>
+      <textarea id="imageRootsInput" rows="3" placeholder="例如：D:\Pictures"></textarea>
+    </label>
+    <label class="field">
+      <span>正文字号：<b id="fontSizeLabel">15</b> px</span>
+      <input type="range" id="fontSizeRange" min="12" max="24" step="1">
+    </label>
+    <label class="field">
+      <span>正文行宽：<b id="lineWidthLabel">860</b> px</span>
+      <input type="range" id="lineWidthRange" min="600" max="1400" step="20">
+    </label>
+    <div class="field-row">
+      <button class="mini-btn" id="btnSetDefaultApp">设为 .md 默认打开方式</button>
+      <button class="mini-btn" id="btnShowPrefsFile">打开配置目录</button>
+    </div>
+    <p class="hint" id="assocHint"></p>
+    <div class="modal-actions">
+      <button class="primary-btn" id="btnSettingsClose">完成</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="vendor/mermaid/mermaid.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

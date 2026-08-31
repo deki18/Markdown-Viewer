@@ -1,0 +1,73 @@
+{
+  "name": "md-viewer",
+  "version": "0.3.1",
+  "productName": "Markdown 查看器",
+  "author": {
+    "name": "Markdown 查看器"
+  },
+  "description": "Markdown 查看器：渲染完整、导航清晰、图片友好",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron . --disable-gpu --disable-gpu-sandbox --no-sandbox",
+    "test": "node test/smoke.js",
+    "icon": "node tools/make-icon.js",
+    "vendor": "node tools/ensure-vendor.js",
+    "prepack": "npm run icon && npm run vendor",
+    "pack": "electron-builder --dir --x64",
+    "predist": "npm run icon && npm run vendor",
+    "dist": "electron-builder --x64 --prepackaged dist/win-unpacked --win nsis",
+    "dist:portable": "electron-builder --x64 --prepackaged dist/win-unpacked --win portable -c.win.artifactName=${productName}-${version}-便携版.${ext}"
+  },
+  "dependencies": {
+    "highlight.js": "^11.9.0",
+    "katex": "^0.16.9",
+    "markdown-it": "^14.1.0",
+    "markdown-it-footnote": "^4.0.0",
+    "markdown-it-task-lists": "^2.1.1",
+    "mermaid": "^10.9.1"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.yuange.mdviewer",
+    "productName": "Markdown 查看器",
+    "executableName": "Markdown 查看器",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "build/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": "x64" },
+        { "target": "portable", "arch": "x64" }
+      ],
+      "artifactName": "${productName}-${version}-安装版.${ext}",
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": true
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true,
+      "uninstallDisplayName": "Markdown 查看器"
+    },
+    "fileAssociations": [
+      {
+        "ext": ["md", "markdown", "mdown", "mkd"],
+        "name": "MarkdownDocument",
+        "description": "Markdown 文档",
+        "role": "Viewer",
+        "icon": "build/icon.ico"
+      }
+    ]
+  }
+}

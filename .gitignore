@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dist-old*/
+release-v*/
+最新版/
+.verify-*/
+verify-*.png
+*.log
+.DS_Store
+Thumbs.db
