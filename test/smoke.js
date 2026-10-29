@@ -284,8 +284,10 @@ test('编辑模式支持左右中心线双向同步滚动', () => {
   assert.ok(appJs.includes("scheduleLinkedScroll('preview')"), '渲染区滚动应同步编辑器')
   assert.ok(appJs.includes("scheduleLinkedScroll('editor')"), '编辑器滚动应同步渲染区')
   assert.ok(appJs.includes('function previewSourceAtCenter(tab, viewport)'), '应按渲染区中心内容解析源位置')
-  assert.ok(appJs.includes('function centerEditorAtSourceLine(line)'), '应把对应源行放到编辑器中心')
+  assert.ok(appJs.includes('function centerEditorAtSourceLine(line, tab)'), '应把对应源行放到编辑器中心')
   assert.ok(appJs.includes('function centerRenderedAtSourceLine(line, tab, scroller)'), '应把对应渲染内容放到预览中心')
+  assert.ok(appJs.includes('function editorPixelYForOffset(') && appJs.includes('function editorOffsetForPixelY('), '应通过像素级镜像测量换算位置，避免软换行导致的行号误差')
+  assert.ok(!appJs.includes('line * metrics.lineHeight'), '不应再用行号乘行高估算编辑器滚动位置')
 })
 
 ;(async () => {

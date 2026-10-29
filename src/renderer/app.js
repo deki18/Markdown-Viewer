@@ -632,20 +632,80 @@
     return { node: best.node, y: rect.top + rect.height * ratio }
   }
 
-  function editorLineMetrics() {
-    const style = getComputedStyle(el.editor)
-    const fontSize = parseFloat(style.fontSize) || 13
-    return {
-      lineHeight: parseFloat(style.lineHeight) || fontSize * 1.7,
-      paddingTop: parseFloat(style.paddingTop) || 0
+  /* 编辑器像素测量：textarea 存在软换行，一个源码行可能占多个视觉行，
+     不能用「行号 × 行高」换算滚动位置。改用与编辑器排版完全一致的镜像 div，
+     通过 Range API 直接测量任意字符偏移的真实像素坐标。 */
+  let editorMirror = null
+
+  function syncEditorMirror() {
+    if (!editorMirror) {
+      editorMirror = document.createElement('div')
+      editorMirror.setAttribute('aria-hidden', 'true')
+      editorMirror.style.cssText = 'position:absolute;left:-99999px;top:0;visibility:hidden;white-space:pre-wrap;overflow-wrap:break-word;box-sizing:border-box;'
+      document.body.appendChild(editorMirror)
     }
+    const style = getComputedStyle(el.editor)
+    const m = editorMirror.style
+    m.fontFamily = style.fontFamily
+    m.fontSize = style.fontSize
+    m.fontWeight = style.fontWeight
+    m.lineHeight = style.lineHeight
+    m.letterSpacing = style.letterSpacing
+    m.tabSize = style.tabSize
+    m.padding = style.padding
+    m.width = el.editor.clientWidth + 'px'
+    const text = String(el.editor.value)
+    if (editorMirror.textContent !== text) editorMirror.textContent = text
+    return editorMirror
   }
 
-  function centerEditorAtSourceLine(line) {
-    const metrics = editorLineMetrics()
-    const target = metrics.paddingTop + line * metrics.lineHeight + metrics.lineHeight / 2 - el.editor.clientHeight / 2
+  function editorPixelYForOffset(offset) {
+    const mirror = syncEditorMirror()
+    const node = mirror.firstChild
+    if (!node || !node.length) return 0
+    const mirrorTop = mirror.getBoundingClientRect().top
+    const len = node.length
+    const o = Math.max(0, Math.min(len, Math.round(offset)))
+    const range = document.createRange()
+    let rect = null
+    const probe = (a, b) => {
+      try {
+        range.setStart(node, a)
+        range.setEnd(node, b)
+        const r = range.getBoundingClientRect()
+        if (r && r.height > 0) rect = r
+      } catch (e) { /* 忽略非法区间 */ }
+    }
+    probe(o, Math.min(o + 1, len))
+    if (!rect && o > 0) probe(o - 1, o)
+    if (!rect) return mirror.getBoundingClientRect().height - mirrorTop
+    return rect.top - mirrorTop + rect.height / 2
+  }
+
+  function editorOffsetForPixelY(y) {
+    const mirror = syncEditorMirror()
+    const node = mirror.firstChild
+    if (!node || !node.length) return 0
+    let lo = 0
+    let hi = node.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (editorPixelYForOffset(mid) < y) lo = mid + 1
+      else hi = mid
+    }
+    return lo
+  }
+
+  function centerEditorAtOffset(offset) {
+    const y = editorPixelYForOffset(offset)
+    const target = y - el.editor.clientHeight / 2
     const max = Math.max(0, el.editor.scrollHeight - el.editor.clientHeight)
     el.editor.scrollTop = Math.max(0, Math.min(max, target))
+  }
+
+  function centerEditorAtSourceLine(line, tab) {
+    if (!tab) return
+    centerEditorAtOffset(sourceOffsetForLine(tab.content, line))
   }
 
   function centerRenderedAtSourceLine(line, tab, scroller) {
@@ -660,15 +720,15 @@
   function syncEditorScrollFromPreview() {
     const tab = activeTab()
     const anchor = previewSourceAtCenter(tab, el.preview.getBoundingClientRect())
-    if (anchor) centerEditorAtSourceLine(anchor.line)
+    if (anchor) centerEditorAtSourceLine(anchor.line, tab)
   }
 
   function syncPreviewScrollFromEditor() {
     const tab = activeTab()
     if (!tab) return
-    const metrics = editorLineMetrics()
-    const center = el.editor.scrollTop + el.editor.clientHeight / 2 - metrics.paddingTop
-    const line = Math.max(0, Math.round(center / metrics.lineHeight - 0.5))
+    const centerY = el.editor.scrollTop + el.editor.clientHeight / 2
+    const offset = editorOffsetForPixelY(centerY)
+    const line = sourceLineForOffset(tab.content, offset)
     centerRenderedAtSourceLine(line, tab, el.preview)
   }
 
@@ -743,9 +803,7 @@
   }
 
   function scrollEditorToSource(offset) {
-    const before = el.editor.value.slice(0, offset)
-    const line = (before.match(/\n/g) || []).length
-    centerEditorAtSourceLine(line)
+    centerEditorAtOffset(offset)
   }
 
   function flashSourceTarget(block) {
@@ -816,7 +874,7 @@
       if (!currentAnchor) return
       if (state.editMode) {
         centerRenderedAtSourceLine(currentAnchor.line, tab, el.preview)
-        centerEditorAtSourceLine(currentAnchor.line)
+        centerEditorAtSourceLine(currentAnchor.line, tab)
       } else {
         centerRenderedAtSourceLine(currentAnchor.line, tab, el.docWrap)
       }
